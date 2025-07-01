@@ -8,6 +8,7 @@ import logging
 import os
 import re
 import subprocess
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Annotated, Union
 
@@ -70,11 +71,11 @@ def set_app_commands(instance: FastAPI) -> None:
     instance.log_stat_command = instance.log_command + ["--stat"]
 
 
-app = FastAPI()
+app = FastAPI(title="GitStats API", description="A FastAPI application for retrieving statistics from a Git repository.", version="1.0.0")
 
 
-@app.on_event("startup")
-async def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     """
     # Summary
 
@@ -92,6 +93,7 @@ async def startup_event():
     app.logger.debug(msg)
     if app.repo_path:
         set_app_commands(app)
+    yield
 
 
 def response_400(response: dict):
