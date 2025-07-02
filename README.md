@@ -39,11 +39,15 @@ In a separate terminal:
     "REQUEST_METHOD": "GET",
     "DATA": {
         "commit_statistics": {
-            "files": 116,
-            "insertions": 2166,
-            "deletions": 658
+            "files": 18,
+            "insertions": 1292,
+            "deletions": 123,
+            "author": "arobel",
+            "after": "2025-07-01",
+            "before": "tomorrow",
+            "command": "git -C /Users/arobel/repos/gitstats log --stat --author=arobel --after=2025-07-01 --before=tomorrow main"
         },
-        "repo": "/Users/arobel/repos/wip",
+        "repo": "/Users/arobel/repos/gitstats",
         "branch": "main"
     },
     "STATUS_CODE": 200

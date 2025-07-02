@@ -748,6 +748,7 @@ async def get_commit_statistics(params: Annotated[GetCommitStatisticsParams, Que
         "author": params.author if params.author else None,
         "after": params.after if params.after else None,
         "before": params.before if params.before else None,
+        "command": ' '.join(command)
     }
     data["repo"] = str(app.repo_path)
     data["branch"] = params.branch if params.branch else current_branch_in_repo(app)
@@ -760,7 +761,11 @@ async def set_current_branch(branch: str = None):
     """
     # Summary
 
-    Set the current branch in the repository.
+    Set the branch that will be queried by the application.
+
+    This does not change the current repository branch setting (i.e. it does not use `git checkout`
+    or `git switch`).  Rather it just sets the branch that is appended to the various git query
+    commands.
 
     # Example usage
 
@@ -885,12 +890,12 @@ async def set_current_repo(repo: str = None):
     if not repo:
         app.repo_path = None
         return response_200(response)
-    repo_path = get_repo_path(repo=repo)
 
-    msg = f"Setting app.repo_path to: {repo_path}"
+    app.repo_path = get_repo_path(repo=repo)
+    set_app_commands(app)
+
+    msg = f"Set app.repo_path to: {app.repo_path}"
     app.log.debug(msg)
 
-    app.repo_path = repo_path
-    set_app_commands(app)
     response["DATA"]["repo"] = str(app.repo_path)
     return response_200(response)

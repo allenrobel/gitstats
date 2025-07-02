@@ -45,7 +45,6 @@ def get_commit_statistics(author=None, branch=None, after=None, before=None, rep
     """
     url = "http://localhost:8000/commit_statistics"
     params = {"author": author, "branch": branch, "after": after, "before": before, "repo": repo}
-    # print(f"params: {params}")
 
     response = requests.get(url, params=params, timeout=10)
     response.raise_for_status()
