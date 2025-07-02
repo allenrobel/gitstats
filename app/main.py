@@ -71,9 +71,6 @@ def set_app_commands(instance: FastAPI) -> None:
     instance.log_stat_command = instance.log_command + ["--stat"]
 
 
-app = FastAPI(title="GitStats API", description="A FastAPI application for retrieving statistics from a Git repository.", version="1.0.0")
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -86,14 +83,18 @@ async def lifespan(app: FastAPI):
     3. Initialize the branch to None.
     4. If the repository path is set, configure the app command templates used by the application.
     """
-    app.logger = get_logger()
+    app.log = get_logger()
+    app.log.debug("Initializing GitStats API application...")
     app.repo_path = get_repo_path("ENV")  # Default to the environment variable GITSTATS_REPO_PATH
     app.branch = None
     msg = f"Repository path: {app.repo_path}"
-    app.logger.debug(msg)
+    app.log.debug(msg)
     if app.repo_path:
         set_app_commands(app)
     yield
+
+
+app = FastAPI(title="GitStats API", description="A FastAPI application for retrieving statistics from a Git repository.", version="1.0.0", lifespan=lifespan)
 
 
 def response_400(response: dict):
@@ -200,7 +201,7 @@ def current_branch_in_repo(app) -> str:
     The name of the current branch as a string.
     """
     if app.branch:
-        app.logger.debug(f"Using previously-set branch: {app.branch}")
+        app.log.debug(f"Using previously-set branch: {app.branch}")
         return app.branch
     command = app.repo_command + ["branch", "--show-current"]
     output = exec_command(command)
@@ -340,14 +341,14 @@ async def get_commit_count(branch: Annotated[CommitCountParams, Query()] = None)
             response.update({"ERROR": error})
             response_400(response)
         msg = f"Using branch: {branch}"
-        app.logger.debug(msg)
+        app.log.debug(msg)
         command.append(branch)
     elif app.branch:
         msg = f"Using previously-set branch: {app.branch}"
-        app.logger.debug(msg)
+        app.log.debug(msg)
         command.append(app.branch)
     msg = f"command: {' '.join(command)}"
-    app.logger.debug(msg)
+    app.log.debug(msg)
     output = exec_command(command)
     response.update({"command_output": output.get("command_output", "")})
     response_400(response)
@@ -403,7 +404,7 @@ async def get_branches():
     command = app.repo_command + ["branch", "--list"]  # pylint: disable=no-member
 
     msg = f"command: {' '.join(command)}"
-    app.logger.debug(msg)
+    app.log.debug(msg)
 
     output = exec_command(command)
     command_output = output.get("command_output", "")
@@ -462,7 +463,7 @@ async def get_current_branch():
     response.update({"REQUEST_METHOD": "GET"})
     if app.branch:
         msg = f"Using previously-set branch: {app.branch}"
-        app.logger.debug(msg)
+        app.log.debug(msg)
         data = {}
         data["branch"] = app.branch
         data["repo"] = str(app.repo_path)
@@ -552,12 +553,18 @@ class GetCommitStatisticsParams(BaseModel):
         examples=["2025-07-01", "yesterday"],
         deprecated=False,
     )
+    repo: str = Field(
+        default=None,
+        title="Repository Path",
+        description="The absolute path to the repository.",
+        deprecated=False,
+    )
 
 
 @app.get(
     "/commit_statistics",
     tags=["Repository Statistics"],
-    description="Get commit statistics (optionally filtered by author, branch, and date range) for the repository.",
+    # description="Get commit statistics (optionally filtered by author, branch, and date range) for the repository.",
 )
 async def get_commit_statistics(params: Annotated[GetCommitStatisticsParams, Query()]):
     """
@@ -666,15 +673,20 @@ async def get_commit_statistics(params: Annotated[GetCommitStatisticsParams, Que
     }
     ```
     """
-    if not app.repo_path:
-        error_no_repo()
+    # if not app.repo_path:
+    #     error_no_repo()
     response = {}
     response.update({"REQUEST_PATH": "/commit_statistics"})
     response.update({"REQUEST_METHOD": "GET"})
 
-    msg = f"params: {params}"
-    app.logger.debug(msg)
+    msg = f"get_commit_statistics(): params: {params}"
+    app.log.debug(msg)
 
+    if not params.repo and not app.repo_path:
+        error_no_repo()
+    if params.repo:
+        app.repo_path = get_repo_path(params.repo)
+        set_app_commands(app)
     command = app.log_stat_command.copy()  # pylint: disable=no-member
     if params.author:
         command.append(f"--author={params.author}")
@@ -683,45 +695,71 @@ async def get_commit_statistics(params: Annotated[GetCommitStatisticsParams, Que
     if params.before:
         command.append(f"--before={params.before}")
     if params.branch:
-        if not is_branch_in_repo(app, params.branch) and params.branch:
+        if not is_branch_in_repo(app, params.branch):
             error = f"Branch '{params.branch}' does not exist in the repository {app.repo_path}"
             response.update({"ERROR": error})
             response_400(response)
 
         msg = f"Using branch: {params.branch}"
-        app.logger.debug(msg)
+        app.log.debug(msg)
 
         command.append(params.branch)
     elif app.branch:
 
         msg = f"Using previously-set branch: {app.branch}"
-        app.logger.debug(msg)
+        app.log.debug(msg)
 
         command.append(app.branch)
 
-    msg = f"command: {' '.join(command)}"
-    app.logger.debug(msg)
+    msg = f"git_commit_statistics(): command: {' '.join(command)}"
+    app.log.debug(msg)
 
     response.update(exec_command(command))
     response_400(response)
 
     command_output = response.get("command_output", "")
+    msg = f"command_output: {command_output}"
+    app.log.debug(msg)
+
     files = 0
     insertions = 0
     deletions = 0
     for line in command_output.splitlines():
+        msg = f"line: {line}"
+        app.log.debug(msg)
+        # 1 file changed, 5 insertions(+), 3 deletions(-)
         # 3 files changed, 294 insertions(+), 42 deletions(-)
-        match = re.search(r"^\s*(\d+)\s*files changed.*?(\d+)\s*insertions.*?(\d+)\s*deletions.*?$", line)
+        # 1 file changed, 14 insertions(+)
+        # 1 file changed, 1 deletion(-)
+        # match = re.search(r"^\s*(\d+)\s*file.* changed.*?(\d+)\s*insertions.*?(\d+)\s*deletions.*?$", line)
+        match = re.search(r"^\s*(\d+)\s*file.* changed.*?$", line)
         if match:
+            msg = f"Found {match.group(1)} files changed in line: {line}"
+            app.log.debug(msg)
             files += int(match.group(1))
-            insertions += int(match.group(2))
-            deletions += int(match.group(3))
+        match = re.search(r"^.*?(\d+)\s*insertions.*?$", line)
+        if match:
+            msg = f"Found {match.group(1)} insertions in line: {line}"
+            app.log.debug(msg)
+            insertions += int(match.group(1))
+        match = re.search(r"^.*?(\d+)\s*deletions.*?$", line)
+        if match:
+            msg = f"Found {match.group(1)} deletions in line: {line}"
+            app.log.debug(msg)
+            deletions += int(match.group(1))
 
     msg = f"Files changed: {files}, Insertions: {insertions}, Deletions: {deletions}"
-    app.logger.debug(msg)
+    app.log.debug(msg)
 
     data = {}
-    data["commit_statistics"] = {"files": files, "insertions": insertions, "deletions": deletions}
+    data["commit_statistics"] = {
+        "files": files,
+        "insertions": insertions,
+        "deletions": deletions,
+        "author": params.author if params.author else None,
+        "after": params.after if params.after else None,
+        "before": params.before if params.before else None,
+    }
     data["repo"] = str(app.repo_path)
     data["branch"] = params.branch if params.branch else current_branch_in_repo(app)
     response.update({"DATA": data})
@@ -752,7 +790,7 @@ async def set_current_branch(branch: str = None):
         return {"error": f"Branch '{branch}' does not exist in the repository {app.repo_path}"}
 
     msg = f"Setting current branch to: {branch}"
-    app.logger.debug(msg)
+    app.log.debug(msg)
 
     app.branch = branch
 
@@ -861,7 +899,7 @@ async def set_current_repo(repo: str = None):
     repo_path = get_repo_path(repo=repo)
 
     msg = f"Setting app.repo_path to: {repo_path}"
-    app.logger.debug(msg)
+    app.log.debug(msg)
 
     app.repo_path = repo_path
     set_app_commands(app)
