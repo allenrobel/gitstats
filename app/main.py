@@ -676,17 +676,13 @@ async def get_commit_statistics(params: Annotated[GetCommitStatisticsParams, Que
     }
     ```
     """
-    # if not app.repo_path:
-    #     error_no_repo()
+    if not params.repo and not app.repo_path:
+        error_no_repo()
+
     response = {}
     response.update({"REQUEST_PATH": "/commit_statistics"})
     response.update({"REQUEST_METHOD": "GET"})
 
-    msg = f"get_commit_statistics(): params: {params}"
-    app.log.debug(msg)
-
-    if not params.repo and not app.repo_path:
-        error_no_repo()
     if params.repo:
         app.repo_path = get_repo_path(params.repo)
         set_app_commands(app)
@@ -721,15 +717,11 @@ async def get_commit_statistics(params: Annotated[GetCommitStatisticsParams, Que
     response_400(response)
 
     command_output = response.get("command_output", "")
-    msg = f"command_output: {command_output}"
-    app.log.debug(msg)
 
     files = 0
     insertions = 0
     deletions = 0
     for line in command_output.splitlines():
-        msg = f"line: {line}"
-        app.log.debug(msg)
         # 1 file changed, 5 insertions(+), 3 deletions(-)
         # 3 files changed, 294 insertions(+), 42 deletions(-)
         # 1 file changed, 14 insertions(+)
