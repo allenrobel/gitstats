@@ -729,18 +729,12 @@ async def get_commit_statistics(params: Annotated[GetCommitStatisticsParams, Que
         # match = re.search(r"^\s*(\d+)\s*file.* changed.*?(\d+)\s*insertions.*?(\d+)\s*deletions.*?$", line)
         match = re.search(r"^\s*(\d+)\s*file.* changed.*?$", line)
         if match:
-            msg = f"Found {match.group(1)} files changed in line: {line}"
-            app.log.debug(msg)
             files += int(match.group(1))
         match = re.search(r"^.*?(\d+)\s*insertions.*?$", line)
         if match:
-            msg = f"Found {match.group(1)} insertions in line: {line}"
-            app.log.debug(msg)
             insertions += int(match.group(1))
         match = re.search(r"^.*?(\d+)\s*deletions.*?$", line)
         if match:
-            msg = f"Found {match.group(1)} deletions in line: {line}"
-            app.log.debug(msg)
             deletions += int(match.group(1))
 
     msg = f"Files changed: {files}, Insertions: {insertions}, Deletions: {deletions}"
