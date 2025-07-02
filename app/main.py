@@ -448,7 +448,16 @@ async def get_commit_count(
     response.update({"command_output": output.get("command_output", "")})
     stats_service.handle_error_response(response)
 
-    response.update({"DATA": {"commit_count": int(output.get("command_output")), "branch": branch, "repo": str(config.repo_path)}})
+    response.update(
+        {
+            "DATA": {
+                "branch": branch,
+                "command": " ".join(command),
+                "commit_count": int(output.get("command_output")),
+                "repo": str(config.repo_path),
+            }
+        }
+    )
     return stats_service.create_success_response(response)
 
 
