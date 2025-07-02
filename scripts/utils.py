@@ -6,17 +6,22 @@ Utility functions for interacting with FastAPI application gitstats repository.
 import requests
 
 
-def set_repo_path(repo):
+def error_message(error) -> str:
     """
-    Set the path to the Git repository.
+    Format an error message for request exceptions.
 
-    :param repo: Absolute path to the Git repository.
+    :param error: The exception raised during the request.
+    :return: Formatted error message.
     """
-    url = f"http://localhost:8000/set_repo?repo={repo}"
-    requests.post(url, timeout=10)
+    msg = "Request error occurred. Check parameters for correctness.\n"
+    msg += "Common issues include:\n"
+    msg += "  - Incorrect repository path\n"
+    msg += "  - Invalid branch name (e.g. does not exist in the repository)\n"
+    msg += f"Error detail: {error}"
+    return msg
 
 
-def get_branches(repo=None):
+def get_branches(repo=None) -> dict:
     """
     Fetch a list of local branches from a Git repository.
 
@@ -33,7 +38,7 @@ def get_branches(repo=None):
     return response.json()
 
 
-def get_commit_statistics(author=None, branch=None, after=None, before=None, repo=None):
+def get_commit_statistics(author=None, branch=None, after=None, before=None, repo=None) -> dict:
     """
     Fetch commit statistics from a Git repository.
 
@@ -52,22 +57,27 @@ def get_commit_statistics(author=None, branch=None, after=None, before=None, rep
     return response.json()
 
 
-def error_message(error):
+def get_top_authors(branch=None, after=None, before=None, limit=10, repo=None) -> dict:
     """
-    Format an error message for request exceptions.
+    Fetch top authors from a Git repository.
 
-    :param error: The exception raised during the request.
-    :return: Formatted error message.
+    :param after: Filter commits after a specific or relative date e.g. "1 week ago", "2025-01-01".
+    :param before: Filter commits before a specific or relative date e.g. "today", "yesterday", "2025-07-01".
+    :param branch: Specify the branch to analyze e.g. develop, main, feature-branch.
+    :param limit: Number of top authors to return (default: 10, max: 100).
+    :param repo: The absolute path to the repository.
+    :return: JSON response with top authors data.
     """
-    msg = "Request error occurred. Check parameters for correctness.\n"
-    msg += "Common issues include:\n"
-    msg += "  - Incorrect repository path\n"
-    msg += "  - Invalid branch name (e.g. does not exist in the repository)\n"
-    msg += f"Error detail: {error}"
-    return msg
+    url = "http://localhost:8000/top_authors"
+    params = {"branch": branch, "after": after, "before": before, "limit": limit, "repo": repo}
+
+    response = requests.get(url, params=params, timeout=10)
+    response.raise_for_status()
+
+    return response.json()
 
 
-def set_branch(branch=None):
+def set_branch(branch=None) -> dict:
     """
     Set the branch in the Git repository.
 
@@ -76,6 +86,18 @@ def set_branch(branch=None):
     :raises requests.RequestException: If the request fails.
     """
     url = f"http://localhost:8000/set_branch?branch={branch}"
+    response = requests.post(url, timeout=10)
+    response.raise_for_status()
+    return response.json()
+
+
+def set_repo_path(repo) -> dict:
+    """
+    Set the path to the Git repository.
+
+    :param repo: Absolute path to the Git repository.
+    """
+    url = f"http://localhost:8000/set_repo?repo={repo}"
     response = requests.post(url, timeout=10)
     response.raise_for_status()
     return response.json()
