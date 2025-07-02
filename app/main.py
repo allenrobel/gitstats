@@ -257,7 +257,7 @@ class CommitCountParams(BaseModel):
 
 
 @app.get("/commit_count", tags=["Repository Statistics"])
-async def get_commit_count(branch: Annotated[CommitCountParams, Query()] = None):
+async def get_commit_count(params: Annotated[CommitCountParams, Query()] = None):
     """
     # Summary
 
@@ -335,24 +335,27 @@ async def get_commit_count(branch: Annotated[CommitCountParams, Query()] = None)
     response.update({"REQUEST_PATH": "/commit_count"})
     response.update({"REQUEST_METHOD": "GET"})
     command = app.repo_command + ["rev-list", "--count", "HEAD"]  # pylint: disable=no-member
-    if branch:
-        if not is_branch_in_repo(app, branch) and branch:
-            error = f"Branch '{branch}' does not exist in the repository {app.repo_path}"
+    branch = None
+    if params.branch:
+        if not is_branch_in_repo(app, params.branch):
+            error = f"Branch '{params.branch}' does not exist in the repository {app.repo_path}"
             response.update({"ERROR": error})
             response_400(response)
-        msg = f"Using branch: {branch}"
+        msg = f"Using branch: {params.branch}"
         app.log.debug(msg)
-        command.append(branch)
+        command.append(params.branch)
+        branch = params.branch
     elif app.branch:
         msg = f"Using previously-set branch: {app.branch}"
         app.log.debug(msg)
         command.append(app.branch)
+        branch = app.branch
     msg = f"command: {' '.join(command)}"
     app.log.debug(msg)
     output = exec_command(command)
     response.update({"command_output": output.get("command_output", "")})
     response_400(response)
-    response.update({"DATA": {"commit_count": int(output.get("command_output")), "branch": branch or current_branch_in_repo(app), "repo": str(app.repo_path)}})
+    response.update({"DATA": {"commit_count": int(output.get("command_output")), "branch": branch, "repo": str(app.repo_path)}})
     return response_200(response)
 
 
