@@ -482,7 +482,7 @@ async def get_branches(
     stats_service.handle_error_response(response)
 
     branches = repo_service.get_branches()
-    data = {"branches": branches, "branch": repo_service.get_current_branch(), "repo": str(config.repo_path)}
+    data = {"branches": branches, "branch": repo_service.get_current_branch(), "command": " ".join(command), "repo": str(config.repo_path)}
     response.update({"DATA": data})
     return stats_service.create_success_response(response)
 
